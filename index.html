@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PDF 轉圖片</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1B2330; --muted:#5D6878; --line:#D3DAE3;
+  --accent:#1F5FD6; --accent-ink:#FFFFFF; --sheet:#E2E7EE; --danger:#C2362B;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161C; --surface:#1A2029; --ink:#E6EAF0; --muted:#9AA5B5; --line:#2E3745;
+    --accent:#6E9BFF; --accent-ink:#0D1420; --sheet:#232B36; --danger:#FF7A6E;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161C; --surface:#1A2029; --ink:#E6EAF0; --muted:#9AA5B5; --line:#2E3745;
+  --accent:#6E9BFF; --accent-ink:#0D1420; --sheet:#232B36; --danger:#FF7A6E;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:16px; line-height:1.6;
+}
+.wrap{max-width:960px; margin:0 auto; padding:32px 20px 64px}
+h1{font-size:1.9rem; line-height:1.2; margin:0 0 6px; font-weight:700; letter-spacing:.01em}
+.lede{color:var(--muted); margin:0 0 24px}
+
+.drop{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  border:2px dashed var(--line); border-radius:14px; background:var(--surface);
+  padding:36px 20px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop:focus-visible{outline:3px solid var(--accent); outline-offset:3px}
+.drop strong{font-size:1.1rem}
+.drop span{color:var(--muted); font-size:.92rem}
+.filelist{margin:12px 0 0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:8px}
+.filelist li{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:4px 10px; font-size:.88rem}
+.filelist li em{color:var(--muted); font-style:normal; margin-left:6px}
+
+.settings{
+  margin-top:20px; background:var(--surface); border:1px solid var(--line); border-radius:14px;
+  padding:18px; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px 20px;
+}
+.field label,.field .lab{display:block; font-size:.88rem; color:var(--muted); margin-bottom:6px}
+.seg{display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden}
+.seg input{position:absolute; opacity:0; pointer-events:none}
+.seg label{flex:1; margin:0; text-align:center; padding:8px 4px; cursor:pointer; color:var(--ink); font-size:.95rem}
+.seg label + input + label{border-left:1px solid var(--line)}
+.seg input:checked + label{background:var(--accent); color:var(--accent-ink)}
+.seg input:focus-visible + label{outline:2px solid var(--accent); outline-offset:-3px}
+select,input[type=text]{
+  width:100%; font:inherit; color:var(--ink); background:var(--bg);
+  border:1px solid var(--line); border-radius:9px; padding:8px 10px;
+}
+input[type=range]{width:100%; accent-color:var(--accent)}
+.hint{font-size:.8rem; color:var(--muted); margin-top:4px}
+
+.actions{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:20px}
+button{
+  font:inherit; font-weight:500; border-radius:10px; padding:10px 18px; cursor:pointer;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+}
+button.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+button:disabled{opacity:.45; cursor:not-allowed}
+button:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.status{color:var(--muted); font-size:.92rem}
+.status.err{color:var(--danger)}
+progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); display:none}
+
+.sheet{
+  margin-top:28px; background:var(--sheet); border-radius:14px; padding:18px;
+  display:none;
+}
+.sheet-head{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px}
+.sheet-head h2{font-size:1.1rem; margin:0}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:16px}
+.frame{background:var(--surface); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:6px}
+.frame .img{background:var(--bg); display:flex; align-items:center; justify-content:center; aspect-ratio:3/4; overflow:hidden; border-radius:3px}
+.frame img{max-width:100%; max-height:100%; display:block; box-shadow:0 0 0 1px var(--line)}
+.frame .meta{display:flex; justify-content:space-between; align-items:baseline; font-size:.8rem; color:var(--muted); gap:6px}
+.frame .meta b{color:var(--ink); font-weight:700; font-variant-numeric:tabular-nums}
+.frame button{padding:6px 8px; font-size:.85rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>PDF 轉圖片</h1>
+  <p class="lede">把 PDF 每一頁轉成 PNG 或 JPG。檔案只在你的瀏覽器裡處理，不會上傳到任何地方。</p>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇 PDF 檔案">
+    <strong>拖曳 PDF 到這裡，或點一下選擇檔案</strong>
+    <span>可一次選多個 PDF</span>
+    <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+  <ul class="filelist" id="fileList"></ul>
+
+  <section class="settings" aria-label="轉換設定">
+    <div class="field">
+      <span class="lab">圖片格式</span>
+      <div class="seg">
+        <input type="radio" name="fmt" id="fmtPng" value="png" checked><label for="fmtPng">PNG</label>
+        <input type="radio" name="fmt" id="fmtJpg" value="jpg"><label for="fmtJpg">JPG</label>
+      </div>
+      <div class="hint">PNG 清晰無損；JPG 檔案較小</div>
+    </div>
+    <div class="field">
+      <label for="dpi">解析度</label>
+      <select id="dpi">
+        <option value="72">72 DPI（螢幕瀏覽）</option>
+        <option value="150" selected>150 DPI（一般使用）</option>
+        <option value="200">200 DPI（清楚）</option>
+        <option value="300">300 DPI（列印品質）</option>
+      </select>
+    </div>
+    <div class="field" id="qualityField">
+      <label for="quality">JPG 品質：<span id="qVal">90</span>%</label>
+      <input type="range" id="quality" min="50" max="100" value="90">
+    </div>
+    <div class="field">
+      <label for="range">頁面範圍</label>
+      <input type="text" id="range" placeholder="空白 = 全部，例：1-3,5,8-">
+      <div class="hint">「8-」表示第 8 頁到最後</div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="primary" id="convertBtn" disabled>開始轉換</button>
+    <span class="status" id="status">尚未選擇檔案</span>
+  </div>
+  <progress id="progress" value="0" max="1"></progress>
+
+  <section class="sheet" id="sheet" aria-live="polite">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">轉換結果</h2>
+      <button class="primary" id="zipBtn">全部下載（ZIP）</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+  const pdfjsLib = window.pdfjsLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  const $ = id => document.getElementById(id);
+  const drop = $("drop"), fileInput = $("fileInput"), fileList = $("fileList");
+  const convertBtn = $("convertBtn"), statusEl = $("status"), progress = $("progress");
+  const sheet = $("sheet"), grid = $("grid"), zipBtn = $("zipBtn"), sheetTitle = $("sheetTitle");
+  const quality = $("quality"), qVal = $("qVal"), qualityField = $("qualityField");
+
+  let files = [];
+  let results = []; // {name, blob}
+  let busy = false;
+
+  // Download: claude.ai viewer capability if present, else a normal link download (GitHub Pages etc.)
+  const dlPromise = (window.claude && typeof window.claude.use === "function")
+    ? window.claude.use("downloads").catch(() => null)
+    : Promise.resolve(null);
+
+  async function saveFile(filename, blob){
+    const dl = await dlPromise;
+    if (dl){
+      try { await dl.save({ filename, data: blob }); return; }
+      catch(e){
+        if (e && e.code === "declined") return;
+        if (e && e.code === "rate_limited"){ setStatus("請稍候再下載一次", true); return; }
+        // fall through to link download
+      }
+    }
+    const a = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  function setStatus(msg, err){ statusEl.textContent = msg; statusEl.classList.toggle("err", !!err); }
+  function fmt(){ return document.querySelector('input[name="fmt"]:checked').value; }
+  function updateQuality(){ qualityField.style.opacity = fmt()==="jpg" ? "1" : ".4"; quality.disabled = fmt()!=="jpg"; }
+  document.querySelectorAll('input[name="fmt"]').forEach(r => r.addEventListener("change", updateQuality));
+  quality.addEventListener("input", () => qVal.textContent = quality.value);
+  updateQuality();
+
+  function setFiles(list){
+    files = Array.from(list).filter(f => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+    fileList.innerHTML = "";
+    files.forEach(f => {
+      const li = document.createElement("li");
+      li.textContent = f.name;
+      const em = document.createElement("em");
+      em.textContent = (f.size/1024/1024).toFixed(1) + " MB";
+      li.appendChild(em);
+      fileList.appendChild(li);
+    });
+    convertBtn.disabled = files.length === 0;
+    if (list.length && !files.length) setStatus("只能選擇 PDF 檔案", true);
+    else setStatus(files.length ? `已選擇 ${files.length} 個檔案` : "尚未選擇檔案");
+  }
+
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("keydown", e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); fileInput.click(); }});
+  fileInput.addEventListener("change", () => setFiles(fileInput.files));
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => setFiles(e.dataTransfer.files));
+
+  function parseRange(text, total){
+    text = text.replace(/\s/g,"").replace(/，/g,",").replace(/[～~—–]/g,"-");
+    if (!text) return Array.from({length:total}, (_,i)=>i+1);
+    const set = new Set();
+    for (const part of text.split(",")){
+      if (!part) continue;
+      const m = part.match(/^(\d*)-(\d*)$/);
+      if (m){
+        let a = m[1] ? parseInt(m[1]) : 1, b = m[2] ? parseInt(m[2]) : total;
+        if (a > b) [a,b] = [b,a];
+        for (let i=Math.max(1,a); i<=Math.min(total,b); i++) set.add(i);
+      } else if (/^\d+$/.test(part)){
+        const n = parseInt(part); if (n>=1 && n<=total) set.add(n);
+      } else throw new Error("頁面範圍格式不正確：" + part);
+    }
+    return Array.from(set).sort((a,b)=>a-b);
+  }
+
+  function baseName(n){ return n.replace(/\.pdf$/i,"").replace(/[\\/:*?"<>|]/g,"_"); }
+
+  const MAX_PIXELS = 16000000; // keep within mobile canvas limits
+
+  async function renderPage(page, dpi, type, q){
+    let scale = dpi / 72;
+    let vp = page.getViewport({ scale });
+    if (vp.width * vp.height > MAX_PIXELS){
+      scale *= Math.sqrt(MAX_PIXELS / (vp.width * vp.height));
+      vp = page.getViewport({ scale });
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const mime = type === "jpg" ? "image/jpeg" : "image/png";
+    const blob = await new Promise(res => canvas.toBlob(res, mime, q));
+    // small thumbnail as data URL
+    const tw = 300, th = Math.round(canvas.height * tw / canvas.width);
+    const t = document.createElement("canvas"); t.width = tw; t.height = th;
+    t.getContext("2d").drawImage(canvas, 0, 0, tw, th);
+    const thumb = t.toDataURL("image/jpeg", 0.8);
+    const dims = canvas.width + "×" + canvas.height;
+    canvas.width = canvas.height = 0; t.width = t.height = 0;
+    return { blob, thumb, dims };
+  }
+
+  function addFrame(item, label){
+    const fr = document.createElement("div"); fr.className = "frame";
+    const box = document.createElement("div"); box.className = "img";
+    const img = document.createElement("img"); img.src = item.thumb; img.alt = item.name;
+    box.appendChild(img);
+    const meta = document.createElement("div"); meta.className = "meta";
+    const b = document.createElement("b"); b.textContent = label;
+    const s = document.createElement("span"); s.textContent = item.dims;
+    meta.append(b, s);
+    const btn = document.createElement("button"); btn.textContent = "下載這張";
+    btn.addEventListener("click", () => saveFile(item.name, item.blob));
+    fr.append(box, meta, btn);
+    grid.appendChild(fr);
+  }
+
+  convertBtn.addEventListener("click", async () => {
+    if (busy || !files.length) return;
+    busy = true; convertBtn.disabled = true; zipBtn.disabled = true;
+    results = []; grid.innerHTML = ""; sheet.style.display = "block";
+    const type = fmt(), dpi = parseInt($("dpi").value), q = parseInt(quality.value)/100;
+    const multi = files.length > 1;
+    progress.style.display = "block";
+
+    try {
+      // first pass: open docs & collect page lists
+      const jobs = [];
+      for (const f of files){
+        setStatus(`讀取 ${f.name}…`);
+        const data = new Uint8Array(await f.arrayBuffer());
+        let doc;
+        try {
+          doc = await pdfjsLib.getDocument({
+            data,
+            cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
+            cMapPacked: true,
+            useSystemFonts: true
+          }).promise;
+        } catch(e){
+          if (e && e.name === "PasswordException") throw new Error(`「${f.name}」有密碼保護，請先移除密碼再轉換`);
+          throw new Error(`「${f.name}」無法開啟，檔案可能已損壞`);
+        }
+        const pages = parseRange($("range").value, doc.numPages);
+        jobs.push({ f, doc, pages });
+      }
+      const total = jobs.reduce((n,j)=>n+j.pages.length, 0);
+      if (!total) throw new Error("頁面範圍內沒有可轉換的頁面");
+      progress.max = total; progress.value = 0;
+
+      let done = 0;
+      for (const { f, doc, pages } of jobs){
+        const base = baseName(f.name);
+        const pad = String(doc.numPages).length;
+        for (const p of pages){
+          setStatus(`轉換中 ${done+1} / ${total}${multi ? "（"+f.name+"）" : ""}`);
+          const page = await doc.getPage(p);
+          const r = await renderPage(page, dpi, type, q);
+          page.cleanup();
+          const name = `${base}_${String(p).padStart(pad,"0")}.${type}`;
+          const item = { name, blob: r.blob, thumb: r.thumb, dims: r.dims };
+          results.push(item);
+          addFrame(item, multi ? `${base} · 第 ${p} 頁` : `第 ${p} 頁`);
+          done++; progress.value = done;
+          await new Promise(r => setTimeout(r, 0));
+        }
+        doc.destroy();
+      }
+      sheetTitle.textContent = `轉換結果：${results.length} 張`;
+      setStatus(`完成，共 ${results.length} 張圖片`);
+    } catch(e){
+      setStatus(e.message || "轉換失敗", true);
+      if (!results.length) sheet.style.display = "none";
+    } finally {
+      busy = false; convertBtn.disabled = files.length === 0; zipBtn.disabled = results.length === 0;
+      progress.style.display = "none";
+    }
+  });
+
+  zipBtn.addEventListener("click", async () => {
+    if (!results.length) return;
+    zipBtn.disabled = true;
+    const old = zipBtn.textContent; zipBtn.textContent = "打包中…";
+    try {
+      const zip = new JSZip();
+      results.forEach(r => zip.file(r.name, r.blob));
+      const blob = await zip.generateAsync({ type: "blob" });
+      const zipName = files.length === 1 ? baseName(files[0].name) + "_圖片.zip" : "PDF轉圖片.zip";
+      await saveFile(zipName, blob);
+    } catch(e){
+      setStatus("打包失敗：" + (e.message || e), true);
+    } finally {
+      zipBtn.textContent = old; zipBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
