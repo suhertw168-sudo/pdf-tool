@@ -39,7 +39,7 @@ body{
 h1{font-size:1.9rem; line-height:1.2; margin:0 0 6px; font-weight:700; letter-spacing:.01em}
 .lede{color:var(--muted); margin:0 0 20px}
 
-.tabs{display:flex; gap:4px; background:var(--sheet); padding:4px; border-radius:12px; margin-bottom:20px; max-width:420px}
+.tabs{display:flex; gap:4px; background:var(--sheet); padding:4px; border-radius:12px; margin-bottom:20px; max-width:560px}
 .tabs button{flex:1; border:0; background:transparent; color:var(--muted); padding:9px 12px; border-radius:9px; font-weight:500}
 .tabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12)}
 [hidden]{display:none!important}
@@ -113,6 +113,23 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
 .tools{display:flex; gap:6px}
 .tools button{flex:1; padding:5px 0; font-size:.95rem; line-height:1}
 .tools button.rm{color:var(--danger)}
+.frame input.rng{padding:5px 8px; font-size:.82rem}
+.frame input.rng.bad{border-color:var(--danger)}
+.pdfph{font-weight:700; color:var(--muted); font-size:1.2rem}
+.grid.pages{grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px}
+.pg{cursor:pointer; outline:2px solid transparent; outline-offset:0; user-select:none}
+.pg:focus-visible{outline-color:var(--accent); outline-offset:2px}
+.pg[aria-checked="true"]{outline-color:var(--accent)}
+.pg[aria-checked="true"] .img img{opacity:.4}
+.pg .chk{
+  position:absolute; top:12px; right:12px; width:24px; height:24px; border-radius:12px;
+  border:2px solid var(--line); background:var(--surface); color:transparent;
+  display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700;
+}
+.pg[aria-checked="true"] .chk{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.pg .pnum{color:var(--muted); font-weight:700; font-size:1.1rem}
+@media (max-width:480px){ .tabs button{padding:9px 4px; font-size:.9rem} }
+.frame .img img{transition:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -124,6 +141,8 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   <div class="tabs" role="tablist">
     <button role="tab" id="tabA" aria-selected="true" aria-controls="panelA">PDF 轉圖片</button>
     <button role="tab" id="tabB" aria-selected="false" aria-controls="panelB">圖片轉 PDF</button>
+    <button role="tab" id="tabC" aria-selected="false" aria-controls="panelC">合併 PDF</button>
+    <button role="tab" id="tabD" aria-selected="false" aria-controls="panelD">拆分 PDF</button>
   </div>
 
   <!-- ============ PDF -> 圖片 ============ -->
@@ -166,6 +185,8 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
 
     <div class="actions">
       <button class="primary" id="convertBtn" disabled>開始轉換</button>
+      <button id="stopBtn" hidden>停止</button>
+      <button id="resetBtn" disabled>清除</button>
       <span class="status" id="status">尚未選擇檔案</span>
     </div>
     <progress id="progress" value="0" max="1"></progress>
@@ -196,7 +217,7 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
         </div>
       </div>
       <div class="grid" id="imgGrid"></div>
-      <div class="hint" style="margin-top:10px">電腦可直接拖曳圖片調整順序；手機用 ‹ › 按鈕移動</div>
+      <div class="hint" style="margin-top:10px">電腦可直接拖曳圖片調整順序；手機用 ‹ › 移動，↻ 可把橫躺的圖片轉正</div>
     </section>
 
     <div class="settings">
@@ -239,9 +260,78 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
 
     <div class="actions">
       <button class="primary" id="makePdfBtn" disabled>產生 PDF</button>
+      <button id="imgStopBtn" hidden>停止</button>
+      <button id="imgResetBtn" disabled>清除</button>
       <span class="status" id="imgStatus">尚未加入圖片</span>
     </div>
     <progress id="imgProgress" value="0" max="1"></progress>
+  </section>
+
+  <!-- ============ 合併 PDF ============ -->
+  <section id="panelC" role="tabpanel" aria-labelledby="tabC" hidden>
+    <div class="drop" id="mergeDrop" tabindex="0" role="button" aria-label="選擇要合併的 PDF">
+      <strong>拖曳 PDF 到這裡，或點一下選擇檔案</strong>
+      <span>可分多次加入，合併後保留原本的文字和畫質</span>
+      <input type="file" id="mergeInput" accept="application/pdf,.pdf" multiple hidden>
+    </div>
+
+    <section class="sheet" id="mergeSheet">
+      <div class="sheet-head">
+        <h2 id="mergeTitle">合併順序</h2>
+        <div class="btns">
+          <button id="mSortBtn">依檔名排序</button>
+          <button id="mClearBtn">全部清除</button>
+        </div>
+      </div>
+      <div class="grid" id="mergeGrid"></div>
+      <div class="hint" style="margin-top:10px">每份 PDF 可以填頁面範圍，空白 = 全部頁；電腦可直接拖曳調整順序，手機用 ‹ › 移動</div>
+    </section>
+
+    <div class="settings">
+      <div class="field">
+        <label for="mergeName">合併後檔名</label>
+        <input type="text" id="mergeName" placeholder="合併檔案">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="mergeBtn" disabled>合併 PDF</button>
+      <button id="mergeStopBtn" hidden>停止</button>
+      <button id="mergeResetBtn" disabled>清除</button>
+      <span class="status" id="mergeStatus">尚未加入 PDF</span>
+    </div>
+    <progress id="mergeProgress" value="0" max="1"></progress>
+  </section>
+
+  <!-- ============ 拆分 PDF ============ -->
+  <section id="panelD" role="tabpanel" aria-labelledby="tabD" hidden>
+    <div class="drop" id="splitDrop" tabindex="0" role="button" aria-label="選擇要拆分的 PDF">
+      <strong>拖曳一份 PDF 到這裡，或點一下選擇檔案</strong>
+      <span>會顯示每一頁，點選要處理的頁面</span>
+      <input type="file" id="splitInput" accept="application/pdf,.pdf" hidden>
+    </div>
+
+    <section class="sheet" id="splitSheet">
+      <div class="sheet-head">
+        <h2 id="splitTitle">頁面</h2>
+        <div class="btns">
+          <button id="sAllBtn">全選</button>
+          <button id="sNoneBtn">取消選取</button>
+        </div>
+      </div>
+      <div class="grid pages" id="splitGrid"></div>
+      <div class="hint" style="margin-top:10px">點縮圖選取頁面，再點一次取消；電腦按住 Shift 點選可以一次選一段</div>
+    </section>
+
+    <div class="actions">
+      <button class="primary" id="sDeleteBtn" disabled>刪除選取頁</button>
+      <button id="sKeepBtn" disabled>只保留選取頁</button>
+      <button id="sSplitBtn" disabled>每頁拆成單獨檔（ZIP）</button>
+      <button id="sStopBtn" hidden>停止</button>
+      <button id="sResetBtn" disabled>清除</button>
+    </div>
+    <div class="actions" style="margin-top:8px"><span class="status" id="splitStatus">尚未選擇檔案</span></div>
+    <progress id="splitProgress" value="0" max="1"></progress>
   </section>
 </main>
 
@@ -249,11 +339,21 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 (function(){
   const $ = id => document.getElementById(id);
 
-  /* ---------- shared: download ---------- */
+  /* ---------- 套件檢查：哪個沒載入就只停用那個功能 ---------- */
+  const LIB = {
+    pdf: !!window.pdfjsLib,
+    zip: !!window.JSZip,
+    jspdf: !!(window.jspdf && window.jspdf.jsPDF),
+    pdflib: !!window.PDFLib
+  };
+  const LIB_MSG = "元件載入失敗，請確認網路連線後重新整理頁面（Ctrl+F5）";
+
+  /* ---------- 共用：下載 ---------- */
   const dlPromise = (window.claude && typeof window.claude.use === "function")
     ? window.claude.use("downloads").catch(() => null)
     : Promise.resolve(null);
@@ -285,8 +385,8 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
     zone.addEventListener("drop", e => onFiles(e.dataTransfer.files));
   }
 
-  /* ---------- tabs ---------- */
-  const tabs = [[$("tabA"),$("panelA")],[$("tabB"),$("panelB")]];
+  /* ---------- 分頁 ---------- */
+  const tabs = [[$("tabA"),$("panelA")],[$("tabB"),$("panelB")],[$("tabC"),$("panelC")],[$("tabD"),$("panelD")]];
   tabs.forEach(([t]) => t.addEventListener("click", () => {
     tabs.forEach(([tt,pp]) => { const on = tt===t; tt.setAttribute("aria-selected", on); pp.hidden = !on; });
   }));
@@ -294,13 +394,14 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   /* =========================================================
      PDF -> 圖片
      ========================================================= */
-  const pdfjsLib = window.pdfjsLib;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const PDF_BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+  if (LIB.pdf) window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_BASE + "pdf.worker.min.js";
 
   const fileList = $("fileList"), convertBtn = $("convertBtn"), statusEl = $("status"), progress = $("progress");
   const sheet = $("sheet"), grid = $("grid"), zipBtn = $("zipBtn"), sheetTitle = $("sheetTitle");
   const quality = $("quality"), qVal = $("qVal"), qualityField = $("qualityField");
-  let files = [], results = [], busy = false;
+  const stopBtn = $("stopBtn"), resetBtn = $("resetBtn");
+  let files = [], results = [], busy = false, cancel = false;
 
   function setStatus(msg, err){ statusEl.textContent = msg; statusEl.classList.toggle("err", !!err); }
   function fmt(){ return document.querySelector('input[name="fmt"]:checked').value; }
@@ -309,7 +410,18 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   quality.addEventListener("input", () => qVal.textContent = quality.value);
   updateQuality();
 
+  function refreshA(){
+    convertBtn.disabled = busy || !files.length || !LIB.pdf;
+    zipBtn.disabled = busy || !results.length || !LIB.zip;
+    resetBtn.disabled = busy || (!files.length && !results.length);
+    stopBtn.hidden = !busy; stopBtn.disabled = false; stopBtn.textContent = "停止";
+    progress.style.display = busy ? "block" : "none";
+  }
+  if (!LIB.pdf) setStatus("PDF " + LIB_MSG, true);
+  refreshA();
+
   function setFiles(list){
+    if (busy) return;
     files = Array.from(list).filter(f => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
     fileList.innerHTML = "";
     files.forEach(f => {
@@ -319,8 +431,9 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
       em.textContent = (f.size/1024/1024).toFixed(1) + " MB";
       li.appendChild(em); fileList.appendChild(li);
     });
-    convertBtn.disabled = files.length === 0;
-    if (list.length && !files.length) setStatus("只能選擇 PDF 檔案", true);
+    refreshA();
+    if (!LIB.pdf) setStatus("PDF " + LIB_MSG, true);
+    else if (list.length && !files.length) setStatus("只能選擇 PDF 檔案", true);
     else setStatus(files.length ? `已選擇 ${files.length} 個檔案` : "尚未選擇檔案");
   }
   bindDrop($("drop"), $("fileInput"), setFiles);
@@ -345,6 +458,18 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   const baseName = n => safeName(n.replace(/\.pdf$/i,""));
   const MAX_PIXELS = 16000000;
 
+  async function openPdf(f){
+    const data = new Uint8Array(await f.arrayBuffer());
+    try {
+      return await window.pdfjsLib.getDocument({
+        data, cMapUrl: PDF_BASE + "cmaps/", cMapPacked: true, useSystemFonts: true
+      }).promise;
+    } catch(e){
+      if (e && e.name === "PasswordException") throw new Error(`「${f.name}」有密碼保護，已略過`);
+      throw new Error(`「${f.name}」無法開啟，已略過`);
+    }
+  }
+
   async function renderPage(page, dpi, type, q){
     let scale = dpi / 72;
     let vp = page.getViewport({ scale });
@@ -364,6 +489,7 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
     const thumb = t.toDataURL("image/jpeg", 0.8);
     const dims = canvas.width + "×" + canvas.height;
     canvas.width = canvas.height = 0; t.width = t.height = 0;
+    if (!blob) throw new Error("圖片產生失敗，可能是解析度太高，請改用較低 DPI");
     return { blob, thumb, dims };
   }
 
@@ -383,61 +509,67 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   }
 
   convertBtn.addEventListener("click", async () => {
-    if (busy || !files.length) return;
-    busy = true; convertBtn.disabled = true; zipBtn.disabled = true;
-    results = []; grid.innerHTML = ""; sheet.style.display = "block";
+    if (busy || !files.length || !LIB.pdf) return;
+    const rangeText = $("range").value;
+    try { parseRange(rangeText, 1); } catch(e){ setStatus(e.message, true); return; }
+
+    busy = true; cancel = false; results = [];
+    grid.innerHTML = ""; sheet.style.display = "block"; sheetTitle.textContent = "轉換結果";
+    refreshA();
     const type = fmt(), dpi = parseInt($("dpi").value), q = parseInt(quality.value)/100;
     const multi = files.length > 1;
-    progress.style.display = "block";
+    const skipped = [];
+
     try {
-      const jobs = [];
-      for (const f of files){
-        setStatus(`讀取 ${f.name}…`);
-        const data = new Uint8Array(await f.arrayBuffer());
+      // 一次只開一個 PDF，轉完就釋放，再開下一個
+      for (let fi = 0; fi < files.length && !cancel; fi++){
+        const f = files[fi];
+        const prefix = multi ? `檔案 ${fi+1}/${files.length}　` : "";
+        setStatus(prefix + "讀取中…");
         let doc;
+        try { doc = await openPdf(f); } catch(e){ skipped.push(e.message); continue; }
         try {
-          doc = await pdfjsLib.getDocument({
-            data, cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
-            cMapPacked: true, useSystemFonts: true
-          }).promise;
-        } catch(e){
-          if (e && e.name === "PasswordException") throw new Error(`「${f.name}」有密碼保護，請先移除密碼再轉換`);
-          throw new Error(`「${f.name}」無法開啟，檔案可能已損壞`);
+          const pages = parseRange(rangeText, doc.numPages);
+          if (!pages.length){ skipped.push(`「${f.name}」頁面範圍內沒有頁面`); continue; }
+          const base = baseName(f.name), pad = String(doc.numPages).length;
+          progress.max = pages.length; progress.value = 0;
+          for (let k = 0; k < pages.length; k++){
+            if (cancel) break;
+            const p = pages[k];
+            setStatus(`${prefix}轉換第 ${k+1} / ${pages.length} 頁`);
+            const page = await doc.getPage(p);
+            const r = await renderPage(page, dpi, type, q);
+            page.cleanup();
+            const item = { name: `${base}_${String(p).padStart(pad,"0")}.${type}`, blob: r.blob, thumb: r.thumb, dims: r.dims };
+            results.push(item);
+            addFrame(item, multi ? `${base} 第 ${p} 頁` : `第 ${p} 頁`);
+            progress.value = k + 1;
+            await tick();
+          }
+        } finally {
+          await doc.destroy();
         }
-        jobs.push({ f, doc, pages: parseRange($("range").value, doc.numPages) });
       }
-      const total = jobs.reduce((n,j)=>n+j.pages.length, 0);
-      if (!total) throw new Error("頁面範圍內沒有可轉換的頁面");
-      progress.max = total; progress.value = 0;
-      let done = 0;
-      for (const { f, doc, pages } of jobs){
-        const base = baseName(f.name), pad = String(doc.numPages).length;
-        for (const p of pages){
-          setStatus(`轉換中 ${done+1} / ${total}${multi ? "（"+f.name+"）" : ""}`);
-          const page = await doc.getPage(p);
-          const r = await renderPage(page, dpi, type, q);
-          page.cleanup();
-          const item = { name: `${base}_${String(p).padStart(pad,"0")}.${type}`, blob: r.blob, thumb: r.thumb, dims: r.dims };
-          results.push(item);
-          addFrame(item, multi ? `${base} 第 ${p} 頁` : `第 ${p} 頁`);
-          done++; progress.value = done;
-          await tick();
-        }
-        doc.destroy();
-      }
-      sheetTitle.textContent = `轉換結果：${results.length} 張`;
-      setStatus(`完成，共 ${results.length} 張圖片`);
+      let msg = cancel ? `已停止，已完成 ${results.length} 張` : `完成，共 ${results.length} 張圖片`;
+      if (skipped.length) msg += "。" + skipped.join("；");
+      if (results.length && !LIB.zip) msg += "。ZIP " + LIB_MSG + "，可先用單張下載";
+      setStatus(msg, skipped.length > 0 || (!LIB.zip && results.length > 0));
     } catch(e){
-      setStatus(e.message || "轉換失敗", true);
-      if (!results.length) sheet.style.display = "none";
+      setStatus((e.message || "轉換失敗") + (results.length ? `（已完成 ${results.length} 張）` : ""), true);
     } finally {
-      busy = false; convertBtn.disabled = files.length === 0; zipBtn.disabled = results.length === 0;
-      progress.style.display = "none";
+      busy = false;
+      if (results.length) sheetTitle.textContent = `轉換結果：${results.length} 張`;
+      else sheet.style.display = "none";
+      refreshA();
     }
   });
 
+  stopBtn.addEventListener("click", () => {
+    cancel = true; stopBtn.disabled = true; stopBtn.textContent = "停止中…";
+  });
+
   zipBtn.addEventListener("click", async () => {
-    if (!results.length) return;
+    if (!results.length || !LIB.zip || busy) return;
     zipBtn.disabled = true;
     const old = zipBtn.textContent; zipBtn.textContent = "打包中…";
     try {
@@ -449,8 +581,19 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
     } catch(e){
       setStatus("打包失敗：" + (e.message || e), true);
     } finally {
-      zipBtn.textContent = old; zipBtn.disabled = false;
+      zipBtn.textContent = old; refreshA();
     }
+  });
+
+  resetBtn.addEventListener("click", () => {
+    if (busy) return;
+    files = []; results = [];
+    fileList.innerHTML = ""; grid.innerHTML = ""; sheet.style.display = "none";
+    $("range").value = ""; $("fileInput").value = "";
+    sheetTitle.textContent = "轉換結果";
+    setStatus(LIB.pdf ? "尚未選擇檔案" : "PDF " + LIB_MSG, !LIB.pdf);
+    refreshA();
+    window.scrollTo({ top: 0 });
   });
 
   /* =========================================================
@@ -458,10 +601,19 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
      ========================================================= */
   const imgGrid = $("imgGrid"), imgSheet = $("imgSheet"), imgTitle = $("imgTitle");
   const imgStatus = $("imgStatus"), imgProgress = $("imgProgress"), makePdfBtn = $("makePdfBtn");
+  const imgResetBtn = $("imgResetBtn"), imgStopBtn = $("imgStopBtn");
   const pageMode = $("pageMode"), orient = $("orient"), margin = $("margin");
-  let items = [], uid = 0, imgBusy = false, dragId = null;
+  let items = [], uid = 0, imgBusy = false, imgCancel = false, dragId = null;
 
   function setImgStatus(msg, err){ imgStatus.textContent = msg; imgStatus.classList.toggle("err", !!err); }
+  function refreshB(){
+    makePdfBtn.disabled = imgBusy || !items.length || !LIB.jspdf;
+    imgResetBtn.disabled = imgBusy || !items.length;
+    $("clearBtn").disabled = imgBusy;
+    imgStopBtn.hidden = !imgBusy; imgStopBtn.disabled = false; imgStopBtn.textContent = "停止";
+    imgProgress.style.display = imgBusy ? "block" : "none";
+  }
+  if (!LIB.jspdf) setImgStatus("PDF 產生" + LIB_MSG, true);
 
   async function decode(file){
     try { return await createImageBitmap(file); }
@@ -473,7 +625,29 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   const dimsOf = b => [b.naturalWidth || b.width, b.naturalHeight || b.height];
   const release = b => { if (b && b.close) b.close(); };
 
+  // 把圖片依角度畫到新的畫布上（rot：0 / 90 / 180 / 270）
+  function drawRotated(src, w, h, rot){
+    const turn = rot % 180 !== 0;
+    const c = document.createElement("canvas");
+    c.width = turn ? h : w; c.height = turn ? w : h;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(rot * Math.PI / 180);
+    ctx.drawImage(src, -w / 2, -h / 2, w, h);
+    return c;
+  }
+
+  async function rotatedThumb(item){
+    if (!item.rot) return item.thumb0;
+    const img = new Image(); img.src = item.thumb0; await img.decode();
+    const c = drawRotated(img, img.naturalWidth, img.naturalHeight, item.rot);
+    const url = c.toDataURL("image/jpeg", .8); c.width = c.height = 0;
+    return url;
+  }
+
   async function addImages(list){
+    if (imgBusy) return;
     const arr = Array.from(list).filter(f => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(f.name));
     if (!arr.length){ if (list.length) setImgStatus("只能加入圖片檔案", true); return; }
     let bad = 0;
@@ -484,17 +658,17 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
         const b = await decode(f);
         const [w, h] = dimsOf(b);
         const tw = 240, th = Math.max(1, Math.round(h * tw / w));
-        const c = document.createElement("canvas"); c.width = tw; c.height = th;
-        const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0,0,tw,th);
-        ctx.drawImage(b, 0, 0, tw, th);
-        items.push({ id: ++uid, file: f, name: f.name, w, h, thumb: c.toDataURL("image/jpeg", .8) });
+        const c = drawRotated(b, tw, th, 0);
+        const t = c.toDataURL("image/jpeg", .8);
+        items.push({ id: ++uid, file: f, name: f.name, rot: 0, thumb0: t, thumb: t });
         release(b); c.width = c.height = 0;
       } catch(e){ bad++; }
       if (i % 5 === 4) { renderItems(); await tick(); }
     }
     renderItems();
     if (!$("pdfName").value && items.length) $("pdfName").value = items[0].name.replace(/\.[^.]+$/, "");
-    setImgStatus(bad ? `已加入 ${items.length} 張，有 ${bad} 張無法讀取（格式不支援）` : `共 ${items.length} 張，將依上方順序排成 PDF`, bad > 0);
+    if (!LIB.jspdf) setImgStatus("PDF 產生" + LIB_MSG, true);
+    else setImgStatus(bad ? `已加入 ${items.length} 張，有 ${bad} 張無法讀取（格式不支援）` : `共 ${items.length} 張，將依上方順序排成 PDF`, bad > 0);
   }
   bindDrop($("imgDrop"), $("imgInput"), addImages);
 
@@ -504,10 +678,15 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
     [items[i], items[j]] = [items[j], items[i]];
     renderItems();
   }
+  async function rotate(id){
+    const it = items.find(x => x.id === id); if (!it || imgBusy) return;
+    it.rot = (it.rot + 90) % 360;
+    it.thumb = await rotatedThumb(it);
+    renderItems();
+  }
 
   function renderItems(){
     imgSheet.style.display = items.length ? "block" : "none";
-    makePdfBtn.disabled = !items.length || imgBusy;
     imgTitle.textContent = `頁面順序：${items.length} 張`;
     imgGrid.innerHTML = "";
     items.forEach((it, idx) => {
@@ -520,12 +699,14 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
       const tools = document.createElement("div"); tools.className = "tools";
       const mk = (txt, label, fn, cls) => { const b = document.createElement("button"); b.textContent = txt; b.title = label; b.setAttribute("aria-label", label); if (cls) b.className = cls; b.addEventListener("click", fn); return b; };
       const prev = mk("‹", "往前移", () => move(it.id, -1)); prev.disabled = idx === 0;
+      const rot = mk("↻", "旋轉 90 度", () => rotate(it.id));
       const next = mk("›", "往後移", () => move(it.id, 1)); next.disabled = idx === items.length - 1;
-      const rm = mk("✕", "移除", () => { items = items.filter(x => x.id !== it.id); renderItems(); setImgStatus(items.length ? `共 ${items.length} 張` : "尚未加入圖片"); }, "rm");
-      tools.append(prev, next, rm);
+      const rm = mk("✕", "移除", () => { if (imgBusy) return; items = items.filter(x => x.id !== it.id); renderItems(); setImgStatus(items.length ? `共 ${items.length} 張` : "尚未加入圖片"); }, "rm");
+      if (imgBusy) [prev, rot, next, rm].forEach(b => b.disabled = true);
+      tools.append(prev, rot, next, rm);
       fr.append(badge, box, meta, tools);
 
-      fr.addEventListener("dragstart", e => { dragId = it.id; fr.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(it.id)); });
+      fr.addEventListener("dragstart", e => { if (imgBusy){ e.preventDefault(); return; } dragId = it.id; fr.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(it.id)); });
       fr.addEventListener("dragend", () => { dragId = null; fr.classList.remove("dragging"); imgGrid.querySelectorAll(".target").forEach(x => x.classList.remove("target")); });
       fr.addEventListener("dragover", e => { if (dragId === null) return; e.preventDefault(); fr.classList.add("target"); });
       fr.addEventListener("dragleave", () => fr.classList.remove("target"));
@@ -539,10 +720,21 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
       });
       imgGrid.appendChild(fr);
     });
+    refreshB();
   }
 
-  $("sortBtn").addEventListener("click", () => { items.sort((a,b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true })); renderItems(); });
-  $("clearBtn").addEventListener("click", () => { items = []; renderItems(); setImgStatus("尚未加入圖片"); });
+  $("sortBtn").addEventListener("click", () => { if (imgBusy) return; items.sort((a,b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true })); renderItems(); });
+  function clearImgs(){
+    if (imgBusy) return;
+    items = []; $("pdfName").value = ""; $("imgInput").value = "";
+    renderItems();
+    setImgStatus(LIB.jspdf ? "尚未加入圖片" : "PDF 產生" + LIB_MSG, !LIB.jspdf);
+    window.scrollTo({ top: 0 });
+  }
+  $("clearBtn").addEventListener("click", clearImgs);
+  imgResetBtn.addEventListener("click", clearImgs);
+  imgStopBtn.addEventListener("click", () => { imgCancel = true; imgStopBtn.disabled = true; imgStopBtn.textContent = "停止中…"; });
+
   function syncPageOptions(){ const a4 = pageMode.value === "a4"; orient.disabled = !a4; margin.disabled = !a4; }
   pageMode.addEventListener("change", syncPageOptions); syncPageOptions();
 
@@ -550,26 +742,28 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
   const A4W = 595.28, A4H = 841.89;
 
   makePdfBtn.addEventListener("click", async () => {
-    if (imgBusy || !items.length) return;
-    imgBusy = true; makePdfBtn.disabled = true;
-    imgProgress.style.display = "block"; imgProgress.max = items.length; imgProgress.value = 0;
+    if (imgBusy || !items.length || !LIB.jspdf) return;
+    const list = items.slice();
+    imgBusy = true; imgCancel = false; renderItems();
+    imgProgress.max = list.length; imgProgress.value = 0;
     const preset = PRESETS[$("sizePreset").value];
     const mode = pageMode.value, ori = orient.value, m = mode === "a4" ? parseFloat(margin.value) : 0;
     const { jsPDF } = window.jspdf;
-    let doc = null, failed = 0;
+    let doc = null, failed = 0, pagesDone = 0;
     try {
-      for (let i = 0; i < items.length; i++){
-        setImgStatus(`製作 PDF 第 ${i+1} / ${items.length} 頁…`);
+      for (let i = 0; i < list.length; i++){
+        if (imgCancel) break;
+        setImgStatus(`製作 PDF 第 ${i+1} / ${list.length} 頁…`);
         let b;
-        try { b = await decode(items[i].file); } catch(e){ failed++; continue; }
+        try { b = await decode(list[i].file); } catch(e){ failed++; continue; }
         const [w, h] = dimsOf(b);
         const s = Math.min(1, preset.max / Math.max(w, h));
-        const cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
-        const c = document.createElement("canvas"); c.width = cw; c.height = ch;
-        const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0,0,cw,ch);
-        ctx.drawImage(b, 0, 0, cw, ch); release(b);
+        const sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
+        const c = drawRotated(b, sw, sh, list[i].rot); release(b);
+        const cw = c.width, ch = c.height;
         const blob = await new Promise(res => c.toBlob(res, "image/jpeg", preset.q));
         c.width = c.height = 0;
+        if (!blob){ failed++; continue; }
         const buf = new Uint8Array(await blob.arrayBuffer());
 
         let pw, ph, x, y, dw, dh;
@@ -586,23 +780,410 @@ progress{width:100%; height:8px; margin-top:12px; accent-color:var(--accent); di
         if (!doc) doc = new jsPDF({ unit: "pt", format: [pw, ph], orientation: po, compress: true });
         else doc.addPage([pw, ph], po);
         doc.addImage(buf, "JPEG", x, y, dw, dh, "img" + i);
+        pagesDone++;
         imgProgress.value = i + 1;
         await tick();
       }
+      if (imgCancel){ setImgStatus("已停止，沒有產生 PDF"); return; }
       if (!doc) throw new Error("沒有可用的圖片");
       setImgStatus("輸出 PDF 中…");
       const out = doc.output("blob");
-      let name = safeName($("pdfName").value || "合併圖片").replace(/\.pdf$/i, "") || "合併圖片";
+      const name = safeName($("pdfName").value || "合併圖片").replace(/\.pdf$/i, "") || "合併圖片";
       const mb = (out.size / 1024 / 1024).toFixed(1);
-      setImgStatus(`完成：${items.length - failed} 頁，${mb} MB` + (failed ? `（${failed} 張無法讀取已略過）` : ""), failed > 0);
+      setImgStatus(`完成：${pagesDone} 頁，${mb} MB` + (failed ? `（${failed} 張無法讀取已略過）` : ""), failed > 0);
       await saveFile(name + ".pdf", out, msg => setImgStatus(msg, true));
     } catch(e){
       setImgStatus("製作失敗：" + (e.message || e) + "。圖片太多時可改選「小檔」或分批製作", true);
     } finally {
-      imgBusy = false; makePdfBtn.disabled = !items.length;
-      imgProgress.style.display = "none";
+      imgBusy = false; renderItems();
     }
   });
+
+  renderItems();
+
+  /* =========================================================
+     合併 PDF
+     ========================================================= */
+  const mGrid = $("mergeGrid"), mSheet = $("mergeSheet"), mTitle = $("mergeTitle");
+  const mStatus = $("mergeStatus"), mProgress = $("mergeProgress");
+  const mergeBtn = $("mergeBtn"), mStopBtn = $("mergeStopBtn"), mResetBtn = $("mergeResetBtn");
+  let mItems = [], mUid = 0, mBusy = false, mCancel = false, mDragId = null;
+
+  function setMStatus(msg, err){ mStatus.textContent = msg; mStatus.classList.toggle("err", !!err); }
+  function refreshC(){
+    mergeBtn.disabled = mBusy || !mItems.length || !LIB.pdflib;
+    mResetBtn.disabled = mBusy || !mItems.length;
+    $("mClearBtn").disabled = mBusy; $("mSortBtn").disabled = mBusy;
+    mStopBtn.hidden = !mBusy; mStopBtn.disabled = false; mStopBtn.textContent = "停止";
+    mProgress.style.display = mBusy ? "block" : "none";
+  }
+  if (!LIB.pdflib) setMStatus("合併" + LIB_MSG, true);
+
+  function rangeCount(it){
+    try { return parseRange(it.range, it.pages).length; } catch(e){ return 0; }
+  }
+  function updateMTitle(){
+    const total = mItems.reduce((n, it) => n + rangeCount(it), 0);
+    mTitle.textContent = `合併順序：${mItems.length} 份，共 ${total} 頁`;
+  }
+
+  // 讀頁數和第一頁縮圖
+  async function pdfInfo(f){
+    if (LIB.pdf){
+      const doc = await openPdf(f);
+      try {
+        const page = await doc.getPage(1);
+        const vp0 = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: 240 / vp0.width });
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.floor(vp.width)); c.height = Math.max(1, Math.floor(vp.height));
+        const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        const thumb = c.toDataURL("image/jpeg", .8); c.width = c.height = 0;
+        page.cleanup();
+        return { pages: doc.numPages, thumb };
+      } finally { await doc.destroy(); }
+    }
+    if (LIB.pdflib){
+      try {
+        const d = await PDFLib.PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
+        return { pages: d.getPageCount(), thumb: null };
+      } catch(e){ throw new Error(`「${f.name}」無法開啟，已略過`); }
+    }
+    throw new Error("PDF " + LIB_MSG);
+  }
+
+  async function addPdfs(list){
+    if (mBusy) return;
+    const arr = Array.from(list).filter(f => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+    if (!arr.length){ if (list.length) setMStatus("只能加入 PDF 檔案", true); return; }
+    const bad = [];
+    for (let i = 0; i < arr.length; i++){
+      setMStatus(`讀取 ${i+1} / ${arr.length}…`);
+      const f = arr[i];
+      try {
+        const info = await pdfInfo(f);
+        mItems.push({ id: ++mUid, file: f, name: f.name, pages: info.pages, thumb: info.thumb, range: "" });
+      } catch(e){ bad.push(e.message || `「${f.name}」無法開啟，已略過`); }
+      renderMerge(); await tick();
+    }
+    if (!$("mergeName").value && mItems.length) $("mergeName").value = baseName(mItems[0].name) + "_合併";
+    if (!LIB.pdflib) setMStatus("合併" + LIB_MSG, true);
+    else if (bad.length) setMStatus(bad.join("；"), true);
+    else setMStatus(`共 ${mItems.length} 份，將依上方順序合併`);
+  }
+  bindDrop($("mergeDrop"), $("mergeInput"), addPdfs);
+
+  function mMove(id, delta){
+    const i = mItems.findIndex(x => x.id === id), j = i + delta;
+    if (i < 0 || j < 0 || j >= mItems.length) return;
+    [mItems[i], mItems[j]] = [mItems[j], mItems[i]];
+    renderMerge();
+  }
+
+  function renderMerge(){
+    mSheet.style.display = mItems.length ? "block" : "none";
+    updateMTitle();
+    mGrid.innerHTML = "";
+    mItems.forEach((it, idx) => {
+      const fr = document.createElement("div"); fr.className = "frame draggable"; fr.draggable = true;
+      const badge = document.createElement("div"); badge.className = "order"; badge.textContent = idx + 1;
+      const box = document.createElement("div"); box.className = "img";
+      if (it.thumb){ const img = document.createElement("img"); img.src = it.thumb; img.alt = it.name; box.appendChild(img); }
+      else { const ph = document.createElement("div"); ph.className = "pdfph"; ph.textContent = "PDF"; box.appendChild(ph); }
+      const meta = document.createElement("div"); meta.className = "meta";
+      const s = document.createElement("span"); s.textContent = it.name; s.title = it.name;
+      const b = document.createElement("b"); b.textContent = `${it.pages} 頁`;
+      meta.append(s, b);
+      const rng = document.createElement("input"); rng.type = "text"; rng.className = "rng";
+      rng.placeholder = "頁面範圍，空白=全部"; rng.value = it.range; rng.disabled = mBusy;
+      rng.setAttribute("aria-label", `${it.name} 的頁面範圍`);
+      const check = () => {
+        let ok = true;
+        try { ok = parseRange(it.range, it.pages).length > 0; } catch(e){ ok = false; }
+        rng.classList.toggle("bad", !ok);
+      };
+      rng.addEventListener("input", () => { it.range = rng.value; check(); updateMTitle(); });
+      rng.addEventListener("focus", () => fr.draggable = false);
+      rng.addEventListener("blur", () => fr.draggable = true);
+      check();
+      const tools = document.createElement("div"); tools.className = "tools";
+      const mk = (txt, label, fn, cls) => { const bt = document.createElement("button"); bt.textContent = txt; bt.title = label; bt.setAttribute("aria-label", label); if (cls) bt.className = cls; bt.addEventListener("click", fn); return bt; };
+      const prev = mk("‹", "往前移", () => mMove(it.id, -1)); prev.disabled = idx === 0;
+      const next = mk("›", "往後移", () => mMove(it.id, 1)); next.disabled = idx === mItems.length - 1;
+      const rm = mk("✕", "移除", () => { if (mBusy) return; mItems = mItems.filter(x => x.id !== it.id); renderMerge(); setMStatus(mItems.length ? `共 ${mItems.length} 份` : "尚未加入 PDF"); }, "rm");
+      if (mBusy) [prev, next, rm].forEach(x => x.disabled = true);
+      tools.append(prev, next, rm);
+      fr.append(badge, box, meta, rng, tools);
+
+      fr.addEventListener("dragstart", e => { if (mBusy){ e.preventDefault(); return; } mDragId = it.id; fr.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(it.id)); });
+      fr.addEventListener("dragend", () => { mDragId = null; fr.classList.remove("dragging"); mGrid.querySelectorAll(".target").forEach(x => x.classList.remove("target")); });
+      fr.addEventListener("dragover", e => { if (mDragId === null) return; e.preventDefault(); fr.classList.add("target"); });
+      fr.addEventListener("dragleave", () => fr.classList.remove("target"));
+      fr.addEventListener("drop", e => {
+        if (mDragId === null) return;
+        e.preventDefault(); e.stopPropagation();
+        const from = mItems.findIndex(x => x.id === mDragId), to = mItems.findIndex(x => x.id === it.id);
+        if (from < 0 || to < 0 || from === to) return;
+        const [m] = mItems.splice(from, 1); mItems.splice(to, 0, m);
+        renderMerge();
+      });
+      mGrid.appendChild(fr);
+    });
+    refreshC();
+  }
+
+  $("mSortBtn").addEventListener("click", () => { if (mBusy) return; mItems.sort((a,b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true })); renderMerge(); });
+  function clearMerge(){
+    if (mBusy) return;
+    mItems = []; $("mergeName").value = ""; $("mergeInput").value = "";
+    renderMerge();
+    setMStatus(LIB.pdflib ? "尚未加入 PDF" : "合併" + LIB_MSG, !LIB.pdflib);
+    window.scrollTo({ top: 0 });
+  }
+  $("mClearBtn").addEventListener("click", clearMerge);
+  mResetBtn.addEventListener("click", clearMerge);
+  mStopBtn.addEventListener("click", () => { mCancel = true; mStopBtn.disabled = true; mStopBtn.textContent = "停止中…"; });
+
+  mergeBtn.addEventListener("click", async () => {
+    if (mBusy || !mItems.length || !LIB.pdflib) return;
+    // 先檢查每份的頁面範圍
+    const plan = [];
+    for (const it of mItems){
+      let idx;
+      try { idx = parseRange(it.range, it.pages); }
+      catch(e){ setMStatus(`「${it.name}」${e.message}`, true); return; }
+      if (!idx.length){ setMStatus(`「${it.name}」頁面範圍內沒有頁面`, true); return; }
+      plan.push({ it, idx: idx.map(n => n - 1) });
+    }
+    mBusy = true; mCancel = false; renderMerge();
+    mProgress.max = plan.length; mProgress.value = 0;
+    const skipped = [];
+    let filesDone = 0;
+    try {
+      const out = await PDFLib.PDFDocument.create();
+      for (let i = 0; i < plan.length; i++){
+        if (mCancel) break;
+        const { it, idx } = plan[i];
+        setMStatus(`合併第 ${i+1} / ${plan.length} 份…`);
+        let src;
+        try { src = await PDFLib.PDFDocument.load(await it.file.arrayBuffer()); }
+        catch(e){ skipped.push(`「${it.name}」有密碼保護或無法讀取，已略過`); continue; }
+        const copied = await out.copyPages(src, idx);
+        copied.forEach(p => out.addPage(p));
+        filesDone++;
+        mProgress.value = i + 1;
+        await tick();
+      }
+      if (mCancel){ setMStatus("已停止，沒有產生 PDF"); return; }
+      if (!out.getPageCount()) throw new Error("沒有可合併的頁面");
+      setMStatus("輸出 PDF 中…");
+      const bytes = await out.save();
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const name = safeName($("mergeName").value || "合併檔案").replace(/\.pdf$/i, "") || "合併檔案";
+      const mb = (blob.size / 1024 / 1024).toFixed(1);
+      let msg = `完成：合併 ${filesDone} 份，共 ${out.getPageCount()} 頁，${mb} MB`;
+      if (skipped.length) msg += "。" + skipped.join("；");
+      setMStatus(msg, skipped.length > 0);
+      await saveFile(name + ".pdf", blob, m => setMStatus(m, true));
+    } catch(e){
+      setMStatus("合併失敗：" + (e.message || e), true);
+    } finally {
+      mBusy = false; renderMerge();
+    }
+  });
+
+  renderMerge();
+
+  /* =========================================================
+     拆分 PDF
+     ========================================================= */
+  const sGrid = $("splitGrid"), sSheet = $("splitSheet"), sTitle = $("splitTitle");
+  const sStatus = $("splitStatus"), sProgress = $("splitProgress");
+  const sDeleteBtn = $("sDeleteBtn"), sKeepBtn = $("sKeepBtn"), sSplitBtn = $("sSplitBtn");
+  const sStopBtn = $("sStopBtn"), sResetBtn = $("sResetBtn");
+  let sFile = null, sPages = 0, sSel = new Set(), sCards = [], sLast = null;
+  let sBusy = false, sLoading = false, sCancel = false, sToken = 0;
+
+  function setSStatus(msg, err){ sStatus.textContent = msg; sStatus.classList.toggle("err", !!err); }
+  const sBase = () => sFile ? baseName(sFile.name) : "拆分";
+  const sSorted = () => Array.from(sSel).sort((a,b) => a - b);
+
+  function refreshD(){
+    const ready = !!sFile && sPages > 0 && !sLoading && !sBusy;
+    const n = sSel.size;
+    sDeleteBtn.disabled = !ready || !n || !LIB.pdflib;
+    sKeepBtn.disabled = !ready || !n || !LIB.pdflib;
+    sSplitBtn.disabled = !ready || !LIB.pdflib || !LIB.zip;
+    sSplitBtn.textContent = n ? "選取頁各存一個檔（ZIP）" : "每頁拆成單獨檔（ZIP）";
+    $("sAllBtn").disabled = sBusy || !sPages; $("sNoneBtn").disabled = sBusy || !n;
+    sResetBtn.disabled = sBusy || !sFile;
+    sStopBtn.hidden = !sBusy; sStopBtn.disabled = false; sStopBtn.textContent = "停止";
+    sProgress.style.display = (sBusy || sLoading) ? "block" : "none";
+    sTitle.textContent = sPages ? `共 ${sPages} 頁，已選 ${n} 頁` : "頁面";
+    sCards.forEach((c, i) => c && c.setAttribute("aria-checked", sSel.has(i) ? "true" : "false"));
+  }
+  if (!LIB.pdf) setSStatus("PDF " + LIB_MSG, true);
+  else if (!LIB.pdflib) setSStatus("拆分" + LIB_MSG, true);
+
+  function toggle(i, shift){
+    if (sBusy) return;
+    if (shift && sLast !== null){
+      const [a, b] = sLast < i ? [sLast, i] : [i, sLast];
+      for (let k = a; k <= b; k++) sSel.add(k);
+    } else if (sSel.has(i)) sSel.delete(i);
+    else sSel.add(i);
+    sLast = i;
+    refreshD();
+  }
+
+  function makeCard(i){
+    const fr = document.createElement("div"); fr.className = "frame pg";
+    fr.setAttribute("role", "checkbox"); fr.setAttribute("aria-checked", "false");
+    fr.setAttribute("aria-label", `第 ${i} 頁`); fr.tabIndex = 0;
+    const chk = document.createElement("div"); chk.className = "chk"; chk.textContent = "✓";
+    const box = document.createElement("div"); box.className = "img";
+    const ph = document.createElement("div"); ph.className = "pnum"; ph.textContent = i; box.appendChild(ph);
+    const meta = document.createElement("div"); meta.className = "meta";
+    const b = document.createElement("b"); b.textContent = `第 ${i} 頁`; meta.appendChild(b);
+    fr.append(chk, box, meta);
+    fr.addEventListener("click", e => toggle(i, e.shiftKey));
+    fr.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter"){ e.preventDefault(); toggle(i, e.shiftKey); } });
+    return { fr, box };
+  }
+
+  async function loadSplit(list){
+    if (sBusy) return;
+    const f = Array.from(list).find(x => x.type === "application/pdf" || /\.pdf$/i.test(x.name));
+    if (!f){ if (list.length) setSStatus("只能選擇 PDF 檔案", true); return; }
+    if (!LIB.pdf){ setSStatus("PDF " + LIB_MSG, true); return; }
+    const token = ++sToken;
+    sFile = f; sPages = 0; sSel = new Set(); sCards = []; sLast = null;
+    sGrid.innerHTML = ""; sSheet.style.display = "block"; sLoading = true;
+    setSStatus("讀取中…"); refreshD();
+    let doc;
+    try { doc = await openPdf(f); }
+    catch(e){
+      if (token !== sToken) return;
+      sFile = null; sLoading = false; sSheet.style.display = "none";
+      setSStatus((e.message || "無法開啟").replace("已略過", "請先移除密碼或換一份檔案"), true);
+      refreshD(); return;
+    }
+    try {
+      sPages = doc.numPages;
+      const boxes = [];
+      for (let i = 1; i <= sPages; i++){ const { fr, box } = makeCard(i); sCards[i] = fr; boxes[i] = box; sGrid.appendChild(fr); }
+      sProgress.max = sPages; sProgress.value = 0;
+      refreshD();
+      for (let i = 1; i <= sPages; i++){
+        if (token !== sToken) break;
+        setSStatus(`載入縮圖 ${i} / ${sPages}…`);
+        const page = await doc.getPage(i);
+        const vp0 = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: 180 / vp0.width });
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.floor(vp.width)); c.height = Math.max(1, Math.floor(vp.height));
+        const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        page.cleanup();
+        if (token !== sToken) break;
+        const img = document.createElement("img"); img.src = c.toDataURL("image/jpeg", .75); img.alt = `第 ${i} 頁`;
+        c.width = c.height = 0;
+        boxes[i].innerHTML = ""; boxes[i].appendChild(img);
+        sProgress.value = i;
+        await tick();
+      }
+    } finally { await doc.destroy(); }
+    if (token !== sToken) return;
+    sLoading = false;
+    setSStatus(LIB.pdflib ? `共 ${sPages} 頁，點選要處理的頁面` : "拆分" + LIB_MSG, !LIB.pdflib);
+    refreshD();
+  }
+  bindDrop($("splitDrop"), $("splitInput"), loadSplit);
+
+  $("sAllBtn").addEventListener("click", () => { if (sBusy) return; for (let i = 1; i <= sPages; i++) sSel.add(i); refreshD(); });
+  $("sNoneBtn").addEventListener("click", () => { if (sBusy) return; sSel.clear(); sLast = null; refreshD(); });
+  sStopBtn.addEventListener("click", () => { sCancel = true; sStopBtn.disabled = true; sStopBtn.textContent = "停止中…"; });
+
+  sResetBtn.addEventListener("click", () => {
+    if (sBusy) return;
+    sToken++;
+    sFile = null; sPages = 0; sSel = new Set(); sCards = []; sLast = null; sLoading = false;
+    sGrid.innerHTML = ""; sSheet.style.display = "none"; $("splitInput").value = "";
+    setSStatus("尚未選擇檔案");
+    refreshD();
+    window.scrollTo({ top: 0 });
+  });
+
+  async function loadSrc(){
+    try { return await PDFLib.PDFDocument.load(await sFile.arrayBuffer()); }
+    catch(e){ throw new Error("這份 PDF 有密碼保護或無法讀取"); }
+  }
+  async function buildPdf(src, indices){
+    const out = await PDFLib.PDFDocument.create();
+    const copied = await out.copyPages(src, indices);
+    copied.forEach(p => out.addPage(p));
+    return new Blob([await out.save()], { type: "application/pdf" });
+  }
+  async function runS(fn){
+    sBusy = true; sCancel = false; refreshD();
+    try { await fn(); }
+    catch(e){ setSStatus("處理失敗：" + (e.message || e), true); }
+    finally { sBusy = false; refreshD(); }
+  }
+
+  sDeleteBtn.addEventListener("click", () => {
+    const keep = [];
+    for (let i = 1; i <= sPages; i++) if (!sSel.has(i)) keep.push(i - 1);
+    if (!keep.length){ setSStatus("不能刪除全部頁面，至少要留一頁", true); return; }
+    const removed = sSel.size;
+    runS(async () => {
+      sProgress.max = 1; sProgress.value = 0;
+      setSStatus("處理中…");
+      const blob = await buildPdf(await loadSrc(), keep);
+      sProgress.value = 1;
+      setSStatus(`完成：刪除 ${removed} 頁，剩 ${keep.length} 頁`);
+      await saveFile(sBase() + "_刪除後.pdf", blob, m => setSStatus(m, true));
+    });
+  });
+
+  sKeepBtn.addEventListener("click", () => {
+    const idx = sSorted().map(n => n - 1);
+    if (!idx.length) return;
+    runS(async () => {
+      sProgress.max = 1; sProgress.value = 0;
+      setSStatus("處理中…");
+      const blob = await buildPdf(await loadSrc(), idx);
+      sProgress.value = 1;
+      setSStatus(`完成：擷取 ${idx.length} 頁`);
+      await saveFile(sBase() + "_擷取.pdf", blob, m => setSStatus(m, true));
+    });
+  });
+
+  sSplitBtn.addEventListener("click", () => {
+    const list = sSel.size ? sSorted() : Array.from({ length: sPages }, (_, i) => i + 1);
+    runS(async () => {
+      const src = await loadSrc();
+      const zip = new JSZip();
+      const base = sBase(), pad = String(sPages).length;
+      sProgress.max = list.length; sProgress.value = 0;
+      for (let k = 0; k < list.length; k++){
+        if (sCancel) break;
+        const p = list[k];
+        setSStatus(`拆分第 ${k+1} / ${list.length} 頁…`);
+        zip.file(`${base}_${String(p).padStart(pad, "0")}.pdf`, await buildPdf(src, [p - 1]));
+        sProgress.value = k + 1;
+        await tick();
+      }
+      if (sCancel){ setSStatus("已停止，沒有產生檔案"); return; }
+      setSStatus("打包中…");
+      const blob = await zip.generateAsync({ type: "blob" });
+      setSStatus(`完成：拆成 ${list.length} 個 PDF`);
+      await saveFile(base + "_拆分.zip", blob, m => setSStatus(m, true));
+    });
+  });
+
+  refreshD();
 })();
 </script>
 </body>
